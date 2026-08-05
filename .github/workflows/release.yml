@@ -1,0 +1,48 @@
+name: release
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    name: build distributions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Build package
+        run: |
+          rm -f src/veloxserver/native_libs/*.so src/veloxserver/native_libs/*.dylib src/veloxserver/native_libs/*.dll
+          python -m pip install --upgrade build twine
+          python -m build --sdist --wheel
+          python -m twine check dist/*
+          python -c "from pathlib import Path; wheels = [p.name for p in Path('dist').glob('*.whl')]; assert wheels and all('py3-none-any.whl' in name for name in wheels), wheels"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/*
+
+  publish:
+    name: publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/veloxserver
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+      - name: Publish package
+        uses: pypa/gh-action-pypi-publish@release/v1

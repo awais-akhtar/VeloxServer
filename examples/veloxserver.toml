@@ -1,0 +1,193 @@
+[server]
+host = "0.0.0.0"
+port = 8080
+workers = 1
+reuse_port = false
+upgrade_command = "python -m veloxserver --config examples/veloxserver.toml"
+upgrade_grace_seconds = 2.0
+upgrade_ready_timeout = 10.0
+upgrade_state_path = "run/upgrade.json"
+file_io_backend = "auto"
+sendfile = true
+aio_threads = 0
+directio_min_bytes = 0
+io_uring = false
+open_file_cache_entries = 1024
+open_file_cache_ttl = 30.0
+open_file_cache_max_bytes = 1048576
+open_file_cache_errors = true
+open_file_cache_min_uses = 1
+open_file_cache_inactive = 60.0
+open_file_cache_metadata = true
+shared_zone_path = "run/zones.sqlite3"
+plugin_paths = ["plugins/header_guard.py", "plugins/modsec_style_waf.py", "plugins/ldap_bridge_auth.py"]
+access_log = true
+log_format = "json"
+access_log_path = "logs/access.log"
+error_log_path = "logs/error.log"
+log_rotate_bytes = 10485760
+gzip = true
+security_headers = true
+health_path = "/healthz"
+metrics_path = "/metrics"
+proxy_timeout = 30.0
+proxy_buffer_bytes = 65536
+rate_limit_per_minute = 600
+rate_limit_burst = 100
+connection_limit = 10000
+connection_limit_per_client = 100
+waf_block_path_patterns = ["/\\.git", "/wp-admin"]
+rewrite_rules = [
+  { pattern = "^/old/(.*)$", replacement = "/new/\\1" },
+]
+error_pages = { 404 = "errors/404.html", 500 = "errors/500.html" }
+
+# HTTP/2 is available over TLS ALPN when h2 is installed.
+# Turn this on together with tls_certfile/tls_keyfile.
+http2 = false
+
+# HTTP/3 is available over QUIC/UDP when aioquic is installed.
+# Turn this on together with tls_certfile/tls_keyfile.
+http3 = false
+http3_port = 8080
+
+# The Rust native core can serve eligible static responses when built.
+native_core = "python"
+# native_core_path = "../native/rust/target/release"
+
+# Enable these when you have certificate files.
+# VeloxServer watches the files and reloads the SSLContext for new connections.
+# tls_certfile = "certs/fullchain.pem"
+# tls_keyfile = "certs/privkey.pem"
+# tls_reload_interval = 5.0
+# tls_ocsp_response_file = "certs/ocsp.der"
+# tls_ocsp_required = false
+# tls_client_verify = "off"
+# tls_client_ca_file = "certs/ca.pem"
+# tls_ecdh_curve = "prime256v1"
+# tls_keylog_file = "logs/tls.keys"
+# tls_alpn_protocols = ["h2", "http/1.1"]
+
+advanced_rewrite_rules = [
+  { pattern = "^/v(?P<version>[0-9]+)/(.*)$", replacement = "/api/$version/$2", methods = ["GET"], hosts = ["example.com"] },
+]
+
+[ai_error_repair]
+enabled = false
+project_path = "."
+log_path = "logs/ai-repair.log"
+suggestions_path = ".veloxserver/repair-suggestions"
+model = "gpt-4.1-mini"
+api_key_env = "OPENAI_API_KEY"
+min_status = 500
+cooldown_seconds = 60
+apply = false
+context_files = ["veloxserver.toml", "pyproject.toml", "README.md"]
+
+[[routes]]
+path = "/"
+kind = "static"
+hosts = ["example.com", "www.example.com"]
+root = "public"
+index = "index.html"
+directory_listing = false
+precompressed = true
+
+[[routes]]
+path = "/private/"
+kind = "static"
+root = "private"
+basic_auth = { admin = "change-me" }
+auth_realm = "private"
+
+[[routes]]
+path = "/jwt/"
+kind = "static"
+root = "private"
+jwt_hs256_secret = "change-me"
+jwt_issuer = "https://issuer.example"
+jwt_audience = "veloxserver"
+jwt_required_claims = { role = "admin" }
+
+[[routes]]
+path = "/oidc/"
+kind = "static"
+root = "private"
+jwt_jwks_url = "https://issuer.example/.well-known/jwks.json"
+jwt_issuer = "https://issuer.example"
+jwt_audience = "veloxserver"
+jwt_required_claims = { role = "admin" }
+jwt_jwks_cache_ttl = 300
+
+[[routes]]
+path = "/protected/"
+kind = "static"
+root = "private"
+external_auth_url = "http://127.0.0.1:9002/auth"
+auth_request = "/auth/check"
+
+[[routes]]
+path = "/ai/"
+kind = "ai"
+ai_backend = "auto"
+ai_model_path = "models/local-model.gguf"
+ai_model_name = "local-assistant"
+ai_system_prompt = "You are the local assistant for this VeloxServer deployment."
+ai_max_tokens = 512
+ai_temperature = 0.7
+ai_context_window = 4096
+ai_chat_enabled = true
+ai_api_enabled = true
+
+[[routes]]
+path = "/api/"
+kind = "proxy"
+upstreams = [
+  "http://127.0.0.1:9000",
+  "http://127.0.0.1:9001",
+  # Linux Gunicorn socket example:
+  # "unix:/run/gunicorn.sock",
+]
+upstream_weights = [2, 1]
+strip_prefix = false
+load_balance = "round_robin"
+retries = 1
+circuit_failures = 3
+circuit_cooldown = 30.0
+active_health_path = "/healthz"
+active_health_interval = 10.0
+active_health_timeout = 2.0
+proxy_cache = true
+proxy_cache_ttl = 30.0
+proxy_cache_max_entries = 1000
+proxy_cache_path = "cache/api"
+proxy_cache_max_disk_bytes = 268435456
+proxy_cache_key = "$protocol $method $host $uri"
+proxy_cache_methods = ["GET", "HEAD"]
+proxy_cache_lock = true
+proxy_cache_lock_timeout = 5.0
+proxy_cache_stale_while_revalidate = 30.0
+proxy_cache_use_stale_on_error = true
+proxy_cache_purge = true
+
+[[streams]]
+name = "smtp"
+protocol = "smtp"
+listen_host = "0.0.0.0"
+listen_port = 2525
+upstream_host = "127.0.0.1"
+upstream_port = 25
+upstreams = ["127.0.0.1:25", "127.0.0.1:26"]
+load_balance = "least_connections"
+proxy_protocol = true
+max_connections = 10000
+max_fails = 2
+fail_timeout = 10
+
+[[streams]]
+name = "dns"
+protocol = "udp"
+listen_host = "0.0.0.0"
+listen_port = 5353
+upstream_host = "1.1.1.1"
+upstream_port = 53

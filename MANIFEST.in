@@ -1,0 +1,21 @@
+include README.md
+include LICENSE
+include CHANGELOG.md
+include CONTRIBUTING.md
+include SECURITY.md
+include SECURITY_AUDIT.md
+include pyproject.toml
+include setup.py
+exclude .dockerignore
+exclude .gitignore
+prune .github
+
+recursive-include benchmarks *.py
+recursive-include deploy *
+recursive-include docs *.md
+recursive-include examples *.toml *.py *.html
+recursive-include fuzz *.py
+recursive-include native *.md *.toml *.rs
+recursive-include src/veloxserver/native_libs *
+recursive-include tests *.py
+recursive-include tools *.py

@@ -1,0 +1,24 @@
+name: ci
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install -e .
+      - run: python -B -m py_compile src/veloxserver/ai.py src/veloxserver/auth.py src/veloxserver/cli.py src/veloxserver/config.py src/veloxserver/deploy_ai.py src/veloxserver/http3.py src/veloxserver/native.py src/veloxserver/plugins.py src/veloxserver/repair.py src/veloxserver/server.py src/veloxserver/shared.py src/veloxserver/stream.py src/veloxserver/workers.py tests/test_server.py tools/http2_stress_matrix.py tools/http3_compat_matrix.py tools/tls_probe_matrix.py tools/proxy_cache_manager.py benchmarks/static_benchmark.py benchmarks/run_controlled_matrix.py fuzz/run_fuzz_campaign.py fuzz/fuzz_native_abi.py
+      - run: python -B -c "import sys, unittest; sys.path.insert(0, 'src'); suite = unittest.defaultTestLoader.discover('tests'); result = unittest.TextTestRunner(verbosity=2).run(suite); raise SystemExit(0 if result.wasSuccessful() else 1)"
+      - run: python fuzz/run_fuzz_campaign.py
+      - run: python -m pip install build twine
+      - run: python -m build
+      - run: python -m twine check dist/*
